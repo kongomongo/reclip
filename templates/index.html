@@ -364,7 +364,37 @@
       line-height: 1.8;
     }
 
-    /* Mobile */
+    /* ==================== iOS Blackhole Share Feature ==================== */
+    .last-share-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 24px;
+      padding: 14px 18px;
+      background: rgba(40, 167, 69, 0.1);
+      border: 2px solid #28a745;
+      border-radius: 12px;
+    }
+    .last-share-bar.hidden { display: none; }
+    .last-share-bar .filename {
+      flex: 1;
+      font-size: 0.9rem;
+      color: #28a745;
+      font-family: 'Instrument Serif', serif;
+    }
+    .last-share-bar button {
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .last-share-bar button:active { transform: scale(0.95); }
+
     @media (max-width: 500px) {
       .brand h1 { font-size: 3rem; }
       .page { padding: 40px 16px 60px; }
@@ -400,6 +430,12 @@
 
     <div id="cards" class="cards"></div>
 
+    <!-- Blackhole-style Share Bar -->
+    <div id="last-share-bar" class="last-share-bar hidden">
+      <div class="filename" id="last-filename-display">Ready to share</div>
+      <button onclick="shareLastSuccessfulFile()">📤 Share to Apps</button>
+    </div>
+
     <div class="footer">
       YouTube &middot; TikTok &middot; Instagram &middot; Twitter/X &middot; Reddit &middot; Facebook<br>
       Vimeo &middot; Twitch &middot; Dailymotion &middot; SoundCloud &middot; Loom &middot; Streamable<br>
@@ -410,6 +446,56 @@
   <script>
     let currentFormat = 'video';
     let cardData = [];
+
+    // ==================== iOS SHARE FEATURE ====================
+    let lastSuccessfulJobId = null;
+    let lastSuccessfulFilename = null;
+
+    function shareFile(jobId, filename) {
+      const url = `/api/file/${jobId}`;
+      fetch(url)
+        .then(res => {
+          if (!res.ok) throw new Error("File not ready yet");
+          return res.blob();
+        })
+        .then(blob => {
+          const file = new File([blob], filename, {
+            type: blob.type || (filename.endsWith('.mp3') ? 'audio/mpeg' : 'video/mp4')
+          });
+
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({
+              files: [file]
+            });
+          } else {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+          }
+        })
+        .catch(err => alert("Share failed: " + err.message));
+    }
+
+    window.shareLastSuccessfulFile = function() {
+      if (lastSuccessfulJobId) {
+        shareFile(lastSuccessfulJobId, lastSuccessfulFilename);
+      }
+    };
+
+    function addShareButtonToCard(card, jobId, filename) {
+      if (card.querySelector('button.share-btn')) return;
+      const shareBtn = document.createElement('button');
+      shareBtn.className = 'card-dl-btn share-btn';
+      shareBtn.style.background = '#28a745';
+      shareBtn.style.marginLeft = '6px';
+      shareBtn.textContent = 'Share';
+      shareBtn.onclick = () => shareFile(jobId, filename);
+      const actions = card.querySelector('.card-actions');
+      if (actions) actions.appendChild(shareBtn);
+    }
+    // ==================== END SHARE FEATURE ====================
 
     function setFormat(btn) {
       document.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
@@ -585,6 +671,24 @@
           <div class="card-actions">${actionHtml}</div>
         </div>
       `;
+
+      // === Apply iOS Share Enhancements when done ===
+      if (c.status === 'done' && c.jobId) {
+        el.dataset.jobId = c.jobId;
+        el.dataset.filename = c.filename || 'reclip-download.mp4';
+
+        lastSuccessfulJobId = c.jobId;
+        lastSuccessfulFilename = c.filename || 'reclip-download.mp4';
+
+        // Show bottom share bar
+        const bar = document.getElementById('last-share-bar');
+        const nameEl = document.getElementById('last-filename-display');
+        nameEl.textContent = lastSuccessfulFilename;
+        bar.classList.remove('hidden');
+
+        // Add Share button inside card
+        setTimeout(() => addShareButtonToCard(el, lastSuccessfulJobId, lastSuccessfulFilename), 100);
+      }
     }
 
     function renderDownloadAll() {
@@ -647,7 +751,7 @@
             c.status = 'done';
             c.filename = data.filename;
             renderCard(idx);
-            saveCard(idx);
+            // saveCard(idx);   // optional: auto-save
           } else if (data.status === 'error') {
             clearInterval(iv);
             c.status = 'error';
