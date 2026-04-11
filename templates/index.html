@@ -823,6 +823,22 @@
 
       if (btn) { btn.disabled = false; btn.textContent = 'Download All'; }
     }
+
+    window.addEventListener('load', () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#add?')) {
+        const params = new URLSearchParams(hash.substring(5)); // skip #add?
+        const url = params.get('url');
+        const fmt = params.get('format') || 'video';
+
+        if (url) {
+          // Auto-trigger
+          document.getElementById('urls').value = url;
+          currentFormat = (fmt === 'mp3' || fmt === 'audio') ? 'audio' : 'video';
+          go();  // or directly call the download logic
+        }
+      }
+    });
   </script>
 </body>
 </html>
