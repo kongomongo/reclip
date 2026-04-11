@@ -608,7 +608,9 @@
       if (c.status === 'ready') {
         actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Download</button>${qualityChips}`;
       } else if (c.status === 'downloading') {
-        actionHtml = `<span class="card-status downloading"><span class="spin"></span> Downloading...</span>`;
+        const progressText = c.progress != null ? ` (${c.progress}%)` : '';
+        const sizeText = c.total_size ? ` of ${c.total_size}` : '';
+        actionHtml = `<span class="card-status downloading"><span class="spin"></span> Downloading to ReClip${progressText}${sizeText}...</span>`;
       } else if (c.status === 'done') {
         actionHtml = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
           <span class="card-status done">${esc(c.filename || '')}</span>`;
@@ -655,6 +657,8 @@
     async function dlCard(idx) {
       const c = cardData[idx];
       c.status = 'downloading';
+      c.progress = 0;
+      c.total_size = null;
       c.error = null;
       renderCard(idx);
 
@@ -691,22 +695,32 @@
         try {
           const res = await fetch(`/api/status/${c.jobId}`);
           const data = await res.json();
+
           if (data.status === 'done') {
             clearInterval(iv);
             c.status = 'done';
             c.filename = data.filename;
+            delete c.progress;
+            delete c.total_size;
             renderCard(idx);
-            // saveCard(idx);   // optional: auto-save
           } else if (data.status === 'error') {
             clearInterval(iv);
             c.status = 'error';
             c.error = data.error;
+            delete c.progress;
+            delete c.total_size;
+            renderCard(idx);
+          } else if (data.status === 'downloading') {
+            c.progress = data.progress ?? c.progress;
+            c.total_size = data.total_size ?? c.total_size;
             renderCard(idx);
           }
         } catch {
           clearInterval(iv);
           c.status = 'error';
           c.error = 'Lost connection to server';
+          delete c.progress;
+          delete c.total_size;
           renderCard(idx);
         }
       }, 1000);
