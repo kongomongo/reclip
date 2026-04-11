@@ -90,6 +90,9 @@ def run_download(job_id, url, format_choice, format_id):
                 except (ValueError, IndexError):
                     pass
 
+            # Give CPU breathing room (prevents 100% usage)
+            time.sleep(0.01)
+            
         # Process finished normally
         returncode = process.wait()
 
