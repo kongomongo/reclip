@@ -99,6 +99,25 @@
       gap: 10px;
       margin-bottom: 6px;
       align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .paste-btn {
+      padding: 9px 18px;
+      border: 1.5px solid var(--card-border);
+      border-radius: 10px;
+      background: var(--card);
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.76rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .paste-btn:hover {
+      border-color: var(--fg);
+      color: var(--fg);
     }
     .pill-group {
       display: flex;
@@ -384,6 +403,7 @@
     </div>
 
     <textarea id="urls" placeholder="Paste one or more URLs..." rows="2"></textarea>
+    <button class="paste-btn" onclick="pasteFromClipboard()">📋 Paste</button>
     <p class="hint">Multiple links? Separate with spaces, commas, or newlines.</p>
 
     <div class="controls">
@@ -407,7 +427,34 @@
     let currentFormat = 'video';
     let cardData = [];
 
-    // ==================== SHARE FEATURE WITH PROGRESS ====================
+    // ==================== CLIPBOARD PASTE FEATURE ====================
+    async function pasteFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (!text) return;
+
+        const ta = document.getElementById('urls');
+        
+        // Replace whatever is there (no appending)
+        ta.value = text.trim();
+
+        // Visual feedback
+        ta.focus();
+        ta.style.transition = 'background 0.2s';
+        ta.style.background = '#f0f0e8';
+        setTimeout(() => {
+          ta.style.background = 'var(--card)';
+        }, 300);
+
+        // Automatically start fetching
+        go();
+      } catch (err) {
+        alert("Could not access clipboard.\n\nMake sure you’re on a secure page (https) and have granted clipboard permission.");
+      }
+    }
+    // ==================== END CLIPBOARD PASTE ====================
+
+    // ==================== SHARE FEATURE WITH THROTTLED PROGRESS ====================
     async function shareFile(jobId, filename, button) {
       const originalText = button.textContent;
       button.disabled = true;
