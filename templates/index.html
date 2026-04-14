@@ -544,6 +544,17 @@
       return `${m}:${sec.toString().padStart(2, '0')}`;
     }
 
+    function formatBytes(bytes) {
+      if (!bytes) return '';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let i = 0;
+      while (bytes >= 1024 && i < units.length - 1) {
+        bytes /= 1024;
+        i++;
+      }
+      return bytes.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+    }
+
     function esc(s) {
       const d = document.createElement('div');
       d.textContent = s;
@@ -678,6 +689,17 @@
         qualityChips = c.formats.map(f =>
           `<button class="q-chip${f.id === c.selectedFormatId ? ' active' : ''}" onclick="pickFormat(${idx}, '${f.id}')">${f.label}</button>`
         ).join('');
+        qualityChips = c.formats.map(f => {
+          const size = f.filesize ? formatBytes(f.filesize) : 
+                       f.filesize_approx ? '~' + formatBytes(f.filesize_approx) : '';
+          const sizeHtml = size ? `<span style="opacity:0.6"> • ${size}</span>` : '';
+      
+          return `<button class="q-chip${f.id === c.selectedFormatId ? ' active' : ''}" 
+                          onclick="pickFormat(${idx}, '${f.id}')">
+                    ${f.label}${sizeHtml}
+                  </button>`;
+        }).join('');
+
       }
 
       let actionHtml = '';
@@ -688,8 +710,12 @@
         const sizeText = c.total_size ? ` of ${c.total_size}` : '';
         actionHtml = `<span class="card-status downloading"><span class="spin"></span> Downloading to ReClip${progressText}${sizeText}...</span>`;
       } else if (c.status === 'done') {
-        actionHtml = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
-          <span class="card-status done">${esc(c.filename || '')}</span>`;
+        const sizeText = c.filesize ? ` • ${formatBytes(c.filesize)}` : '';
+        actionHtml = `
+          <button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
+          <span class="card-status done">
+            ${esc(c.filename || '')}${sizeText}
+          </span>`;
       } else if (c.status === 'error') {
         actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Retry</button>
           <span class="card-status error">${esc(friendlyError(c.error || 'Download failed'))}</span>`;
@@ -776,6 +802,7 @@
             clearInterval(iv);
             c.status = 'done';
             c.filename = data.filename;
+            c.filesize = data.filesize
             delete c.progress;
             delete c.total_size;
             renderCard(idx);

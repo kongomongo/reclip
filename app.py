@@ -134,6 +134,7 @@ def run_download(job_id, url, format_choice, format_id):
 
         job["status"] = "done"
         job["file"] = chosen
+        job["filesize"] = os.path.getsize(chosen)
         ext = os.path.splitext(chosen)[1]
         title = job.get("title", "").strip()
         # Sanitize title for filename
@@ -182,10 +183,21 @@ def get_info():
 
         formats = []
         for height, f in best_by_height.items():
+            size = f.get("filesize")
+            tbr = f.get("tbr") or 0          # total bitrate (video + audio)
+            duration = info.get("duration") or f.get("duration")
+
+            # Calculate approximate size in bytes
+            filesize_approx = None
+            if tbr > 0 and duration:
+                filesize_approx = int(tbr * 1000 * duration / 8)   # tbr is in kbps
+
             formats.append({
                 "id": f["format_id"],
                 "label": f"{height}p",
                 "height": height,
+                "filesize": size,
+                "filesize_approx": filesize_approx,
             })
         formats.sort(key=lambda x: x["height"], reverse=True)
 
@@ -219,7 +231,8 @@ def start_download():
         "url": url,
         "title": title,
         "progress": 0,
-        "total_size": None
+        "total_size": None,
+        "filesize": None
     }
 
     thread = threading.Thread(target=run_download, args=(job_id, url, format_choice, format_id))
@@ -239,7 +252,8 @@ def check_status(job_id):
         "error": job.get("error"),
         "filename": job.get("filename"),
         "progress": job.get("progress") if job["status"] == "downloading" else None,
-        "total_size": job.get("total_size") if job["status"] == "downloading" else None
+        "total_size": job.get("total_size") if job["status"] == "downloading" else None,
+        "filesize": job.get("filesize") if job["status"] == "done" else None
     })
 
 
