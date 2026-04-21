@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ReClip — Free Media Downloader</title>
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' width='200' height='200'%3E%3Crect width='200' height='200' fill='%230a0a0a'/%3E%3Ctext x='24' y='138' font-family='serif' font-size='92' font-weight='400' fill='%23f0f0f0' letter-spacing='-4'%3ERe%3C/text%3E%3Ctext x='106' y='138' font-family='serif' font-size='92' font-style='italic' font-weight='400' fill='%23ffcc66' letter-spacing='-4'%3EClip%3C/text%3E%3C/svg%3E" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -45,17 +45,26 @@
     .page {
       max-width: 620px;
       margin: 0 auto;
-      padding: 60px 24px 80px;
+      padding: 40px 16px 20px;
     }
 
-    .brand { margin-bottom: 48px; }
+    .brand { margin-bottom: 20px; }
+    
+    .logo-row {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
     .brand h1 {
       font-family: 'Instrument Serif', serif;
-      font-size: 4.2rem;
+      font-size: 3.1rem;
       font-weight: 400;
       letter-spacing: -0.03em;
       line-height: 1;
       color: var(--fg);
+      margin: 0;
     }
     .brand h1 em { font-style: italic; color: var(--accent); }
     .brand p {
@@ -65,7 +74,32 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
+    .brand .tagline {
+      font-size: 0.78rem;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      margin: 0;
+      padding-top: 8px;           /* aligns nicely with the baseline */
+    }
 
+    /* Mobile adjustments */
+    @media (max-width: 500px) {
+      .brand h1 {
+        font-size: 2.85rem;
+      }
+      
+      .logo-row {
+        gap: 8px;
+      }
+      
+      .brand .tagline {
+        font-size: 0.72rem;
+        padding-top: 6px;
+      }
+    }    
+    
     textarea {
       width: 100%;
       padding: 18px 20px;
@@ -96,7 +130,7 @@
 
     .controls {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       margin-bottom: 6px;
       align-items: center;
       flex-wrap: wrap;
@@ -114,6 +148,7 @@
       transition: all 0.2s;
       letter-spacing: 0.03em;
       white-space: nowrap;
+      flex-shrink: 0;
     }
     .paste-btn:hover {
       border-color: var(--fg);
@@ -125,6 +160,7 @@
       border-radius: 10px;
       overflow: hidden;
       background: var(--card);
+      flex-shrink: 0;
     }
     .pill {
       padding: 9px 18px;
@@ -179,9 +215,9 @@
     }
 
     .card-thumb {
-      width: 120px;
-      min-width: 120px;
-      height: 80px;
+      width: 108px;
+      min-width: 108px;
+      height: 68px;
       border-radius: 8px;
       overflow: hidden;
       background: var(--card-border);
@@ -290,6 +326,32 @@
     .card-status.done { color: var(--success); }
     .card-status.error { color: var(--error); }
 
+    /* Done state - buttons side by side */
+    .card-actions-done {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .card-actions-done .card-dl-btn {
+      flex-shrink: 0;
+    }
+
+    .card-actions-done .filename {
+      font-size: 0.72rem;
+      opacity: 0.85;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @media (max-width: 500px) {
+      .card-actions-done .filename {
+        font-size: 0.68rem;
+      }
+    }
     .q-chip {
       padding: 4px 10px;
       border: 1.5px solid var(--card-border);
@@ -398,12 +460,13 @@
 <body>
   <div class="page">
     <div class="brand">
-      <h1>Re<em>Clip</em></h1>
-      <p>Free media downloader</p>
+      <div class="logo-row">
+        <h1>Re<em>Clip</em></h1>
+        <p class="tagline">FREE MEDIA DOWNLOADER</p>
+      </div>
     </div>
-
+    
     <textarea id="urls" placeholder="Paste one or more URLs..." rows="2"></textarea>
-    <button class="paste-btn" onclick="pasteFromClipboard()">📋 Paste</button>
     <p class="hint">Multiple links? Separate with spaces, commas, or newlines.</p>
 
     <div class="controls">
@@ -411,6 +474,7 @@
         <button class="pill active" data-format="video" onclick="setFormat(this)">MP4</button>
         <button class="pill" data-format="audio" onclick="setFormat(this)">MP3</button>
       </div>
+      <button class="paste-btn" onclick="pasteFromClipboard()">📋 Paste</button>
       <button class="fetch-btn" id="goBtn" onclick="go()">Fetch</button>
     </div>
 
@@ -712,10 +776,13 @@
       } else if (c.status === 'done') {
         const sizeText = c.filesize ? ` • ${formatBytes(c.filesize)}` : '';
         actionHtml = `
-          <button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
-          <span class="card-status done">
-            ${esc(c.filename || '')}${sizeText}
-          </span>`;
+          <div class="card-actions-done">
+            <button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
+            <button class="card-dl-btn share-btn" onclick="shareFile('${c.jobId}', '${esc(c.filename || 'reclip-download.mp4')}', this)">Share</button>
+            <span class="card-status done filename">
+              ${esc(c.filename || '')}${sizeText}
+            </span>
+          </div>`;
       } else if (c.status === 'error') {
         actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Retry</button>
           <span class="card-status error">${esc(friendlyError(c.error || 'Download failed'))}</span>`;
@@ -734,9 +801,6 @@
       if (c.status === 'done' && c.jobId) {
         el.dataset.jobId = c.jobId;
         el.dataset.filename = c.filename || 'reclip-download.mp4';
-
-        // Add Share button inside card (regular share button)
-        setTimeout(() => addShareButtonToCard(el, c.jobId, c.filename || 'reclip-download.mp4'), 100);
       }
     }
 
