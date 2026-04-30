@@ -519,7 +519,10 @@
     // ==================== END CLIPBOARD PASTE ====================
 
     // ==================== SHARE FEATURE WITH THROTTLED PROGRESS ====================
-    async function shareFile(jobId, filename, button) {
+    async function shareFile(idx, button) {
+      const c = cardData[idx];
+      if (!c.jobId) return;
+
       const originalText = button.textContent;
       button.disabled = true;
       button.style.opacity = '0.7';
@@ -527,7 +530,7 @@
       let lastUiUpdate = Date.now();
 
       try {
-        const res = await fetch(`/api/file/${jobId}`);
+        const res = await fetch(`/api/file/${c.jobId}`);
         if (!res.ok) throw new Error("File not ready yet");
 
         const contentLength = parseInt(res.headers.get('Content-Length')) || 0;
@@ -556,8 +559,8 @@
         }
 
         const blob = new Blob(chunks);
-        const file = new File([blob], filename, {
-          type: blob.type || (filename.endsWith('.mp3') ? 'audio/mpeg' : 'video/mp4')
+        const file = new File([blob], c.filename, {
+          type: blob.type || (c.filename.endsWith('.mp3') ? 'audio/mpeg' : 'video/mp4')
         });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -565,7 +568,7 @@
         } else {
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
-          a.download = filename;
+          a.download = c.filename;
           a.click();
           URL.revokeObjectURL(a.href);
         }
@@ -576,18 +579,6 @@
         button.style.opacity = '1';
         button.textContent = originalText;   // back to "Share"
       }
-    }
-
-    function addShareButtonToCard(card, jobId, filename) {
-      if (card.querySelector('button.share-btn')) return;
-
-      const shareBtn = document.createElement('button');
-      shareBtn.className = 'card-dl-btn share-btn';
-      shareBtn.textContent = 'Share';
-      shareBtn.onclick = () => shareFile(jobId, filename, shareBtn);
-
-      const actions = card.querySelector('.card-actions');
-      if (actions) actions.appendChild(shareBtn);
     }
     // ==================== END SHARE FEATURE ====================
 
@@ -778,7 +769,7 @@
         actionHtml = `
           <div class="card-actions-done">
             <button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
-            <button class="card-dl-btn share-btn" onclick="shareFile('${c.jobId}', '${esc(c.filename || 'reclip-download.mp4')}', this)">Share</button>
+            <button class="card-dl-btn share-btn" onclick="shareFile(${idx}, this)">Share</button>
             <span class="card-status done filename">
               ${esc(c.filename || '')}${sizeText}
             </span>
