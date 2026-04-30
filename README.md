@@ -1,3 +1,15 @@
+# this is my modification, which adds the following features:
+- add share button so you dont have to download files but can share them immediatly (warning most browsers have arounda 100MB limit)
+- show progress and (approximate) filesize while downloading to ReClip
+- add a nice favicon
+- dark/gold styling, compact
+- Paste Button
+- show progress downloading to local device
+- show filesizes for the different resolutions
+- enable #add? url parameter syntax for sharing from other apps/sites
+
+<img width="766" height="442" alt="image" src="https://github.com/user-attachments/assets/03b61012-5ea2-4ac6-a04e-56fc39a6a1de" /><img width="764" height="532" alt="image" src="https://github.com/user-attachments/assets/9ea4b762-ecb0-44ec-a95e-0133a34e4bc2" /><img width="749" height="148" alt="image" src="https://github.com/user-attachments/assets/a7a9e86c-01a5-48f4-bc71-67482e8d4d9c" /><img width="756" height="144" alt="image" src="https://github.com/user-attachments/assets/1d2710ab-e5e6-44ff-9fa7-84b8a4f2932a" />
+
 # ReClip
 
 A self-hosted, open-source video and audio downloader with a clean web UI. Paste links from YouTube, TikTok, Instagram, Twitter/X, and 1000+ other sites — download as MP4 or MP3.
