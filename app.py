@@ -86,7 +86,12 @@ def run_download(job_id, url, format_choice, format_id):
                     if 'of' in parts:
                         idx = parts.index('of') + 1
                         if idx < len(parts):
-                            job["total_size"] = parts[idx]
+                            # check for approx value: 54.3% of ~ 10.98MiB
+                            if parts[idx] == '~':
+                                job["total_size"] = "~"+parts[idx+1]
+                            else:
+                                job["total_size"] = parts[idx]
+                            
                 except (ValueError, IndexError):
                     pass
 
