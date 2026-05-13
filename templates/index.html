@@ -669,6 +669,7 @@
               uploader: data.uploader || '',
               formats: data.formats || [],
               selectedFormatId: data.formats?.[0]?.id || null,
+              has_any_audio: data.has_any_audio || false,
             };
           }
         } catch (err) {
@@ -741,9 +742,6 @@
 
       let qualityChips = '';
       if (!isAudio && c.formats && c.formats.length > 1) {
-        qualityChips = c.formats.map(f =>
-          `<button class="q-chip${f.id === c.selectedFormatId ? ' active' : ''}" onclick="pickFormat(${idx}, '${f.id}')">${f.label}</button>`
-        ).join('');
         qualityChips = c.formats.map(f => {
           const size = f.filesize ? formatBytes(f.filesize) : 
                        f.filesize_approx ? '~' + formatBytes(f.filesize_approx) : '';
@@ -828,6 +826,7 @@
             format: currentFormat,
             format_id: c.selectedFormatId,
             title: c.title || '',
+            has_any_audio: c.has_any_audio || false,
           }),
         });
         const data = await res.json();

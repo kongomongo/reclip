@@ -14,18 +14,23 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 jobs = {}
 
 
-def run_download(job_id, url, format_choice, format_id):
+def run_download(job_id, url, format_choice, format_id, has_any_audio):
     job = jobs[job_id]
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
 
     cmd = ["yt-dlp", "--no-playlist", "-o", out_template]
+    
+    if has_any_audio:
+        bestaudio_param="+bestaudio"
+    else:
+        bestaudio_param=""
 
     if format_choice == "audio":
         cmd += ["-x", "--audio-format", "mp3"]
     elif format_id:
-        cmd += ["-f", f"{format_id}+bestaudio/best", "--merge-output-format", "mp4"]
+        cmd += ["-f", f"{format_id}{bestaudio_param}/best", "--merge-output-format", "mp4"]
     else:
-        cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
+        cmd += ["-f", f"bestvideo{bestaudio_param}/best", "--merge-output-format", "mp4"]
 
     cmd.append(url)
 
@@ -176,6 +181,14 @@ def get_info():
             return jsonify({"error": result.stderr.strip().split("\n")[-1]}), 400
 
         info = json.loads(result.stdout)
+        
+        # Check if any format has audio -> important later when downloading, can we use +bestaudio
+        has_any_audio = False
+        for f in info.get("formats", []):
+            acodec = f.get("acodec")
+            if acodec and acodec != "none":
+                has_any_audio = True
+                break
 
         # Build quality options — keep best format per resolution
         best_by_height = {}
@@ -212,6 +225,7 @@ def get_info():
             "duration": info.get("duration"),
             "uploader": info.get("uploader", ""),
             "formats": formats,
+            "has_any_audio": has_any_audio,
         })
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out fetching video info"}), 400
@@ -226,6 +240,7 @@ def start_download():
     format_choice = data.get("format", "video")
     format_id = data.get("format_id")
     title = data.get("title", "")
+    has_any_audio = data.get("has_any_audio", False)
 
     if not url:
         return jsonify({"error": "No URL provided"}), 400
@@ -240,7 +255,7 @@ def start_download():
         "filesize": None
     }
 
-    thread = threading.Thread(target=run_download, args=(job_id, url, format_choice, format_id))
+    thread = threading.Thread(target=run_download, args=(job_id, url, format_choice, format_id, has_any_audio))
     thread.daemon = True
     thread.start()
 
