@@ -185,8 +185,7 @@ def get_info():
         # Check if any format has audio -> important later when downloading, can we use +bestaudio
         has_any_audio = False
         for f in info.get("formats", []):
-            acodec = f.get("acodec")
-            if acodec and acodec != "none":
+            if f.get("acodec", "none") != "none" or f.get("audio_ext", "none") != "none" or f.get("resolution", "") == "audio only":
                 has_any_audio = True
                 break
 
