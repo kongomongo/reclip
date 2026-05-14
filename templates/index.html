@@ -388,32 +388,29 @@
       width: 24px;
       height: 24px;
     }
-    .card-error-msg {
-      font-size: 0.72rem;
-      color: var(--error);
-      margin-top: 2px;
-      line-height: 1.4;
-    }
-    .card-error-url {
-      font-size: 0.65rem;
-      color: var(--muted);
-      word-break: break-all;
-      margin-top: 4px;
-    }
     .error-container {
       position: relative;
       cursor: pointer;
     }
+    .card-error-msg,
+    .card-error-full {
+      font-size: 0.72rem;
+      margin-top: 2px;
+      line-height: 1.4;
+      color: var(--error);
+      word-break: break-all;
+    }
     .card-error-full {
       display: none;
       color: #ff9a9a;
-      word-break: break-all;
       white-space: pre-wrap;
     }
-    /* Expanded state */
-    .error-container.expanded {
-      display: none;
+    .card-error-url {
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 4px;
     }
+    /* Expanded state */
     .error-container.expanded .card-error-full {
       display: block;
     }
