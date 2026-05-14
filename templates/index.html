@@ -400,6 +400,31 @@
       word-break: break-all;
       margin-top: 4px;
     }
+    .error-container {
+      position: relative;
+      cursor: pointer;
+    }
+    .card-error-full {
+      display: none;
+      color: #ff9a9a;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    /* Expanded state */
+    .error-container.expanded .card-error-msg.truncated {
+      display: none;
+    }
+    .error-container.expanded .card-error-full {
+      display: block;
+    }
+    .error-container:hover .card-error-msg.truncated {
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .error-container .expand-hint {
+      font-size: 0.65rem;
+      opacity: 0.75;
+    }
 
     /* Download all bar */
     .dl-all-bar {
@@ -712,6 +737,10 @@
       // Error state
       if (c.status === 'info-error') {
         el.className = 'card card-error';
+        const truncatedError = friendlyError(c.error || '');
+        const fullError = c.error || '';
+        const isTruncated = (truncatedError != fullError);
+  
         el.innerHTML = `
           <div class="card-thumb">
             <div class="card-error-icon">
@@ -720,10 +749,21 @@
           </div>
           <div class="card-body">
             <div class="card-title" style="color:var(--error)">Could not fetch video</div>
-            <div class="card-error-msg">${esc(friendlyError(c.error || ''))}</div>
+            <div class="error-container">
+              <div class="card-error-msg">${esc(truncatedError)}${isTruncated ? '<span class="expand-hint">(tap for full)</span>' : ''}</div>
+              <div class="card-error-full">${esc(fullError)}</div>
+            </div>
             <div class="card-error-url">${esc(c.url)}</div>
           </div>
         `;
+        
+        // Minimal JS - just toggle a class
+        const container = el.querySelector('.error-container');
+          if (container) {
+            container.addEventListener('click', () => {
+            container.classList.toggle('expanded');
+          });
+        }
         return;
       }
 
