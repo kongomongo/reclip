@@ -757,7 +757,8 @@
 
       let actionHtml = '';
       if (c.status === 'ready') {
-        actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Download</button>${qualityChips}`;
+        const audioNote = c.has_any_audio ? '' : ' w/o audio';
+        actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Download${audioNote}</button>${qualityChips}`;
       } else if (c.status === 'downloading') {
         const progressText = c.progress != null ? ` (${c.progress}%)` : '';
         const sizeText = c.total_size ? ` of ${c.total_size}` : '';
