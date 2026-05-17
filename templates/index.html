@@ -750,12 +750,13 @@
           </div>
         `;
         
-        // Minimal JS - just toggle a class
-        const container = el.querySelector('.error-container');
-          if (container) {
-            container.addEventListener('click', () => {
-            container.classList.toggle('expanded');
-          });
+        if (isTruncated) {
+          const container = el.querySelector('.error-container');
+            if (container) {
+              container.addEventListener('click', () => {
+              container.classList.toggle('expanded');
+            });
+          }
         }
         return;
       }
