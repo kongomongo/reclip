@@ -49,7 +49,7 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
     cmd.append(url)
 
     process = None
-    output_lines = []          # <-- NEW: collect all output for error extraction
+    output_lines = []
 
     try:
         process = subprocess.Popen(
@@ -62,7 +62,6 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
 
         job["progress"] = 0
         job["total_size"] = None
-
         last_update = time.time()
         start_time = time.time()
 
@@ -98,8 +97,7 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
                     # percentage
                     for p in parts:
                         if '%' in p:
-                            perc_str = p.rstrip('%')
-                            job["progress"] = int(float(perc_str))
+                            job["progress"] = int(float(p.rstrip('%')))
                             break
                     # total size (right after "of")
                     if 'of' in parts:
@@ -117,9 +115,7 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
             # Give CPU breathing room (prevents 100% usage)
             time.sleep(0.01)
             
-        # Process finished normally
         returncode = process.wait()
-
         if job.get("status") == "error":
             return  # already set by timeout/no-progress
 
@@ -135,7 +131,7 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
             job["error"] = error_msg
             return
 
-        # === Post-download file handling (unchanged) ===
+        # Post-download handling (unchanged)
         files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))
         if not files:
             job["status"] = "error"
@@ -188,58 +184,84 @@ def get_info():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
-    cmd = ["yt-dlp", "--no-playlist", "-j", url]
+    # Changed to --flat-playlist -J
+    cmd = ["yt-dlp", "--flat-playlist", "-J", "--quiet", "--no-warnings", url]
+
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        
         if result.returncode != 0:
-            return jsonify({"error": result.stderr.strip().split("\n")[-1]}), 400
+            error = (result.stderr or result.stdout).strip()
+            return jsonify({"error": error.split("\n")[-1] if error else "yt-dlp error"}), 400
 
         info = parse_ytdlp_json(result.stdout)
-        
-        # Check if any format has audio -> important later when downloading, can we use +bestaudio
-        has_any_audio = False
-        for f in info.get("formats", []):
-            if f.get("acodec", "none") != "none" or f.get("audio_ext", "none") != "none" or f.get("resolution", "") == "audio only":
-                has_any_audio = True
-                break
+        entries = info.get("entries")
 
-        # Build quality options — keep best format per resolution
-        best_by_height = {}
-        for f in info.get("formats", []):
-            height = f.get("height")
-            if height and f.get("vcodec", "none") != "none":
-                tbr = f.get("tbr") or 0
-                if height not in best_by_height or tbr > (best_by_height[height].get("tbr") or 0):
-                    best_by_height[height] = f
-
-        formats = []
-        for height, f in best_by_height.items():
-            size = f.get("filesize")
-            tbr = f.get("tbr") or 0          # total bitrate (video + audio)
-            duration = info.get("duration") or f.get("duration")
-
-            # Calculate approximate size in bytes
-            filesize_approx = None
-            if tbr > 0 and duration:
-                filesize_approx = int(tbr * 1000 * duration / 8)   # tbr is in kbps
-
-            formats.append({
-                "id": f["format_id"],
-                "label": f"{height}p",
-                "height": height,
-                "filesize": size,
-                "filesize_approx": filesize_approx,
+        # === Multiple videos case ===
+        if entries and len(entries) > 1:
+            videos = []
+            for i, entry in enumerate(entries):
+                videos.append({
+                    "index": i + 1,
+                    "title": entry.get("title") or f"Video {i+1}",
+                    "url": entry.get("url") or url,   # direct video URL when available
+                    "thumbnail": entry.get("thumbnail") or "",
+                    "duration": entry.get("duration"),
+                    "uploader": entry.get("uploader") or "",
+                    "has_any_audio": any(f.get("acodec") != "none" or f.get("audio_ext") != "none" or f.get("resolution", "") == "audio only"
+                                       for f in entry.get("formats", []))
+                })
+            return jsonify({
+                "is_playlist": True,
+                "title": entries[0].get("playlist_title") or "Multiple Videos",
+                "videos": videos
             })
-        formats.sort(key=lambda x: x["height"], reverse=True)
+        else:
+            # has_any_audio check
+            has_any_audio = any(
+                f.get("acodec", "none") != "none" or f.get("audio_ext", "none") != "none" or f.get("resolution", "") == "audio only"
+                for f in info.get("formats", [])
+            )
 
-        return jsonify({
-            "title": info.get("title", ""),
-            "thumbnail": info.get("thumbnail", ""),
-            "duration": info.get("duration"),
-            "uploader": info.get("uploader", ""),
-            "formats": formats,
-            "has_any_audio": has_any_audio,
-        })
+            # Build quality options — keep best format per resolution
+            best_by_height = {}
+            for f in info.get("formats", []):
+                height = f.get("height")
+                if height and f.get("vcodec", "none") != "none":
+                    tbr = f.get("tbr") or 0
+                    if height not in best_by_height or tbr > (best_by_height[height].get("tbr") or 0):
+                        best_by_height[height] = f
+
+            formats = []
+            for height, f in best_by_height.items():
+                size = f.get("filesize")
+                tbr = f.get("tbr") or 0          # total bitrate (video + audio)
+                duration = info.get("duration") or f.get("duration")
+
+                # Calculate approximate size in bytes
+                filesize_approx = None
+                if tbr > 0 and duration:
+                    filesize_approx = int(tbr * 1000 * duration / 8)   # tbr is in kbps
+
+                formats.append({
+                    "id": f["format_id"],
+                    "label": f"{height}p",
+                    "height": height,
+                    "filesize": size,
+                    "filesize_approx": filesize_approx,
+                })
+            formats.sort(key=lambda x: x["height"], reverse=True)
+
+            return jsonify({
+                "is_playlist": False,
+                "title": info.get("title", ""),
+                "thumbnail": info.get("thumbnail", ""),
+                "duration": info.get("duration"),
+                "uploader": info.get("uploader", ""),
+                "formats": formats,
+                "has_any_audio": has_any_audio,
+            })
+
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out fetching video info"}), 400
     except Exception as e:
@@ -324,4 +346,4 @@ def download_file(job_id):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8899))
     host = os.environ.get("HOST", "127.0.0.1")
-    app.run(host=host, port=port)
+    app.run(host=host, port=port, debug=False)
