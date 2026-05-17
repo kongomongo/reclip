@@ -662,8 +662,7 @@
       container.innerHTML = '';
       cardData = [];
 
-      for (let i = 0; i < urls.length; i++) {
-        const url = urls[i];
+      for (let url of urls) {
         const idx = cardData.length;
         cardData.push({ url, status: 'loading' });
         renderCard(idx);
@@ -678,17 +677,40 @@
           if (data.error) {
             cardData[idx] = { ...cardData[idx], status: 'info-error', error: data.error };
           } else {
-            cardData[idx] = {
-              ...cardData[idx],
-              status: 'ready',
-              title: data.title || '',
-              thumbnail: data.thumbnail || '',
-              duration: data.duration,
-              uploader: data.uploader || '',
-              formats: data.formats || [],
-              selectedFormatId: data.formats?.[0]?.id || null,
-              has_any_audio: data.has_any_audio || false,
-            };
+            if (data.is_playlist) {
+              // Expand playlist into multiple cards
+              container.removeChild(document.getElementById(`card-${idx}`));
+              cardData.splice(idx, 1);
+
+              for (let v of data.videos) {
+                const newIdx = cardData.length;
+                cardData.push({
+                  url: v.url,
+                  status: 'ready',
+                  title: v.title,
+                  thumbnail: v.thumbnail,
+                  duration: v.duration,
+                  uploader: v.uploader || data.title,
+                  has_any_audio: v.has_any_audio,
+                  formats: [{id: null, label: "Best Quality"}],
+                  selectedFormatId: null
+                });
+                renderCard(newIdx);
+              }
+            } else {
+              // Single video
+              cardData[idx] = {
+                ...cardData[idx],
+                status: 'ready',
+                title: data.title || '',
+                thumbnail: data.thumbnail || '',
+                duration: data.duration,
+                uploader: data.uploader || '',
+                formats: data.formats || [],
+                selectedFormatId: data.formats?.[0]?.id || null,
+                has_any_audio: data.has_any_audio || false,
+              };
+            }
           }
         } catch (err) {
           cardData[idx] = { ...cardData[idx], status: 'info-error', error: err.message };
