@@ -187,6 +187,7 @@ def get_info():
         if entries and len(entries) > 1:
             videos = []
             for i, entry in enumerate(entries):
+                srcformats = entry.get("formats", [])
                 videos.append({
                     "index": i + 1,
                     "title": entry.get("title") or f"Video {i+1}",
@@ -194,8 +195,8 @@ def get_info():
                     "thumbnail": entry.get("thumbnail") or "",
                     "duration": entry.get("duration"),
                     "uploader": entry.get("uploader") or "",
-                    "has_any_audio": any(f.get("acodec") != "none" or f.get("audio_ext") != "none" or f.get("resolution", "") == "audio only"
-                                       for f in entry.get("formats", []))
+                    "has_any_audio": (len(srcformats) == 1) or any(f.get("acodec") != "none" or f.get("audio_ext") != "none" or f.get("resolution", "") == "audio only"
+                        for f in srcformats)
                 })
             return jsonify({
                 "is_playlist": True,
@@ -204,10 +205,9 @@ def get_info():
             })
         else:
             # has_any_audio check
-            has_any_audio = any(
-                f.get("acodec", "none") != "none" or f.get("audio_ext", "none") != "none" or f.get("resolution", "") == "audio only"
-                for f in info.get("formats", [])
-            )
+            srcformats = info.get("formats", [])
+            has_any_audio = (len(srcformats) == 1) or any(f.get("acodec", "none") != "none" or f.get("audio_ext", "none") != "none" or f.get("resolution", "") == "audio only"
+                for f in srcformats)
 
             # Build quality options — keep best format per resolution
             best_by_height = {}
