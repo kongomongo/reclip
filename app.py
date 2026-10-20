@@ -5,6 +5,8 @@ import json
 import subprocess
 import threading
 import time
+import logging
+import shutil
 from flask import Flask, request, jsonify, send_file, render_template
 
 app = Flask(__name__)
@@ -13,13 +15,30 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 jobs = {}
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, # change to .DEBUG for debug logging via journalctl
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
+logger.info("yt-dlp path: %s", shutil.which("yt-dlp"))
+logger.info("yt-dlp cwd: %s", os.getcwd())
+logger.info("yt-dlp uid: %s", os.getuid())
+logger.info("yt-dlp HOME: %s", os.environ.get("HOME"))
+logger.info("yt-dlp PATH: %s", os.environ.get("PATH"))
+
+for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"):
+    logger.info("%s configured: %s", key, bool(os.environ.get(key)))
 
 def run_download(job_id, url, format_choice, format_id, has_any_audio):
     job = jobs[job_id]
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
 
+    # cmd = ["yt-dlp", "--verbose", "--print-traffic", "--no-playlist", "-o", out_template]
     cmd = ["yt-dlp", "--no-playlist", "-o", out_template]
-    
+
     if has_any_audio:
         bestaudio_param="+bestaudio"
     else:
@@ -38,6 +57,8 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
     output_lines = []
 
     try:
+        logger.info("yt-dlp args: %r", cmd)
+
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -57,12 +78,14 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
                 break
 
             output_lines.append(line)          # save for later error parsing
+            logger.debug(f"yt-dlp: {line}")
 
             current_time = time.time()
 
             # === No-progress kill (60 seconds of silence) ===
             if current_time - last_update > 60:
                 process.kill()
+                logger.error("No progress received for 1 minute")
                 job["status"] = "error"
                 job["error"] = "No progress received for 1 minute"
                 break
@@ -70,6 +93,7 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
             # === Safety hard timeout (5 min total) ===
             if current_time - start_time > 300:
                 process.kill()
+                logger.error("Download timed out (5 min limit)")
                 job["status"] = "error"
                 job["error"] = "Download timed out (5 min limit)"
                 break
@@ -94,34 +118,35 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
                                 job["total_size"] = "~"+parts[idx+1]
                             else:
                                 job["total_size"] = parts[idx]
-                            
                 except (ValueError, IndexError):
                     pass
 
             # Give CPU breathing room (prevents 100% usage)
             time.sleep(0.01)
-            
+
         returncode = process.wait()
         if job.get("status") == "error":
             return  # already set by timeout/no-progress
 
         if returncode != 0:
             job["status"] = "error"
-            # Restore original behavior: take the last meaningful error line
+            logger.error("Download failed.")
             error_msg = "Download failed."
             for line in reversed(output_lines):
                 stripped = line.strip()
                 if stripped and not stripped.startswith('[download]'):
                     error_msg += stripped
+                    logger.error(stripped)
                     break
             job["error"] = error_msg
             return
 
-        # Post-download handling (unchanged)
+        # Post-download handling
         files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))
         if not files:
             job["status"] = "error"
             job["error"] = "Download completed but no file was found"
+            logger.error("Download completed but no file was found")
             return
 
         if format_choice == "audio":
@@ -153,6 +178,7 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
     except Exception as e:
         job["status"] = "error"
         job["error"] = str(e)
+        logger.error(str(e))
     finally:
         if process and process.poll() is None:
             process.kill()
