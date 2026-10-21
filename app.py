@@ -28,9 +28,23 @@ logger.info("yt-dlp cwd: %s", os.getcwd())
 logger.info("yt-dlp uid: %s", os.getuid())
 logger.info("yt-dlp HOME: %s", os.environ.get("HOME"))
 logger.info("yt-dlp PATH: %s", os.environ.get("PATH"))
-
 for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"):
     logger.info("%s configured: %s", key, bool(os.environ.get(key)))
+
+def parse_ytdlp_json(stdout):
+    """Parse yt-dlp JSON output.
+
+    With ``-j`` yt-dlp prints one JSON object per line. Some extractors
+    emit multiple videos even with ``--no-playlist``, so stdout contains
+    several objects and a plain ``json.loads`` raises "Extra data".
+    Return the first valid object.
+    """
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        return json.loads(line)
+    raise ValueError("yt-dlp returned no data")
 
 def run_download(job_id, url, format_choice, format_id, has_any_audio):
     job = jobs[job_id]
@@ -170,7 +184,7 @@ def run_download(job_id, url, format_choice, format_id, has_any_audio):
         title = job.get("title", "").strip()
         # Sanitize title for filename
         if title:
-            safe_title = "".join(c for c in title if c not in r'\/:*?"<>|').strip()[:20].strip()
+            safe_title = "".join(c for c in title if c not in r'\/:*?"<>|').strip()[:100].strip()
             job["filename"] = f"{safe_title}{ext}" if safe_title else os.path.basename(chosen)
         else:
             job["filename"] = os.path.basename(chosen)
@@ -206,7 +220,7 @@ def get_info():
             error = (result.stderr or result.stdout).strip()
             return jsonify({"error": error.split("\n")[-1] if error else "yt-dlp error"}), 400
 
-        info = json.loads(result.stdout)
+        info = parse_ytdlp_json(result.stdout)
         entries = info.get("entries")
 
         # === Multiple videos case ===
@@ -276,6 +290,29 @@ def get_info():
 
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out fetching video info"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/playlist", methods=["POST"])
+def get_playlist_info():
+    data = request.json
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    cmd = ["yt-dlp", "--flat-playlist", "-J", url]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            return jsonify({"error": result.stderr.strip().split("\n")[-1]}), 400
+
+        info = json.loads(result.stdout)
+        entries = info.get("entries", [])
+        urls = [entry.get("url") for entry in entries if entry.get("url")]
+        return jsonify({"urls": urls})
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Timed out fetching playlist info"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
